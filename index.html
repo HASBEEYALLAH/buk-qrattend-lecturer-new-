@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BUK QRAttend — Lecturer Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root {
+  --navy:#0A1628; --slate:#1B2A45; --card:#162035;
+  --gold:#C9A84C; --gold-dim:#A8873A; --gold-glow:rgba(201,168,76,0.15);
+  --white:#F0F4FF; --muted:#8A9BC0; --border:rgba(138,155,192,0.15);
+  --error:#EF4444; --error-bg:rgba(239,68,68,0.1); --success:#22C55E;
+  --radius:12px; --radius-sm:8px; --shadow:0 4px 24px rgba(0,0,0,0.4);
+  --transition: all 0.2s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:'Inter',sans-serif;background:var(--navy);color:var(--white);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased;}
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;font-weight:700;line-height:1.2;}
+p{color:var(--muted);font-size:0.95rem;}
+a{color:var(--gold);text-decoration:none;}
+.container{width:100%;max-width:1200px;margin:0 auto;padding:0 1.5rem;}
+.page-wrapper{min-height:100vh;display:flex;flex-direction:column;}
+
+/* Navbar */
+.navbar{background:rgba(10,22,40,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.navbar-brand{display:flex;align-items:center;gap:0.75rem;}
+.logo-icon{width:38px;height:38px;background:var(--gold);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:var(--navy);}
+.brand-text{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;color:var(--white);}
+.brand-text span{color:var(--gold);}
+.navbar-actions{display:flex;align-items:center;gap:1rem;}
+.navbar-user{font-size:0.85rem;color:var(--muted);}
+.navbar-user strong{color:var(--white);}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;transition:var(--transition);}
+.card-header{margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600;color:var(--white);}
+.card-subtitle{font-size:0.8rem;color:var(--muted);margin-top:0.25rem;}
+
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--gold);}
+.stat-value{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:700;color:var(--gold);line-height:1;margin-bottom:0.35rem;}
+.stat-label{font-size:0.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+
+/* Forms */
+.form-group{margin-bottom:1.25rem;}
+.form-label{display:block;font-size:0.82rem;font-weight:500;color:var(--muted);margin-bottom:0.45rem;text-transform:uppercase;letter-spacing:0.5px;}
+.form-control{width:100%;padding:0.75rem 1rem;background:var(--slate);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--white);font-size:0.95rem;font-family:'Inter',sans-serif;outline:none;transition:var(--transition);}
+.form-control:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow);}
+.form-control::placeholder{color:var(--muted);}
+select.form-control option{background:var(--slate);color:var(--white);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+@media(max-width:600px){.form-row{grid-template-columns:1fr;}}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:0.5rem;padding:0.75rem 1.5rem;border-radius:var(--radius-sm);font-family:'Inter',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;border:none;transition:var(--transition);text-decoration:none;white-space:nowrap;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-primary{background:var(--gold);color:var(--navy);}
+.btn-primary:hover:not(:disabled){background:var(--gold-dim);transform:translateY(-1px);}
+.btn-outline{background:transparent;color:var(--gold);border:1px solid var(--gold);}
+.btn-outline:hover:not(:disabled){background:var(--gold-glow);}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
+.btn-ghost:hover:not(:disabled){color:var(--white);border-color:var(--muted);}
+.btn-sm{padding:0.45rem 0.9rem;font-size:0.82rem;}
+.btn-full{width:100%;}
+
+/* Alerts */
+.alert{padding:0.85rem 1rem;border-radius:var(--radius-sm);font-size:0.88rem;margin-bottom:1rem;display:none;}
+.alert.show{display:block;}
+.alert-error{background:var(--error-bg);border:1px solid rgba(239,68,68,0.3);color:#FCA5A5;}
+.alert-success{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:#86EFAC;}
+.alert-info{background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);color:var(--gold);}
+
+/* Table */
+.table-wrapper{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:0.88rem;}
+thead{background:var(--slate);}
+thead th{padding:0.9rem 1rem;text-align:left;font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:rgba(27,42,69,0.5);}
+tbody td{padding:0.9rem 1rem;color:var(--white);vertical-align:middle;}
+
+/* Badges & Chips */
+.badge{display:inline-flex;align-items:center;padding:0.25rem 0.65rem;border-radius:99px;font-size:0.75rem;font-weight:600;}
+.badge-gold{background:var(--gold-glow);color:var(--gold);border:1px solid rgba(201,168,76,0.3);}
+.badge-success{background:rgba(34,197,94,0.1);color:#86EFAC;border:1px solid rgba(34,197,94,0.3);}
+.badge-muted{background:rgba(138,155,192,0.1);color:var(--muted);border:1px solid var(--border);}
+.chip{display:inline-flex;align-items:center;padding:0.2rem 0.6rem;border-radius:99px;font-size:0.75rem;font-weight:500;background:var(--slate);color:var(--muted);border:1px solid var(--border);}
+
+/* Auth */
+.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem;background:radial-gradient(ellipse at 20% 50%,rgba(201,168,76,0.05) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(27,42,69,0.8) 0%,transparent 60%),var(--navy);}
+.auth-card{width:100%;max-width:440px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2.5rem;box-shadow:var(--shadow);}
+.auth-logo{text-align:center;margin-bottom:2rem;}
+.logo-badge{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:var(--gold);border-radius:var(--radius);margin-bottom:1rem;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;color:var(--navy);}
+.auth-logo h1{font-size:1.5rem;color:var(--white);margin-bottom:0.25rem;}
+.auth-logo p{font-size:0.85rem;color:var(--muted);}
+.auth-tabs{display:flex;background:var(--slate);border-radius:var(--radius-sm);padding:4px;margin-bottom:1.75rem;gap:4px;}
+.auth-tab{flex:1;padding:0.6rem;text-align:center;font-size:0.85rem;font-weight:600;color:var(--muted);cursor:pointer;border-radius:6px;border:none;background:transparent;transition:var(--transition);}
+.auth-tab.active{background:var(--card);color:var(--gold);}
+.auth-footer{text-align:center;margin-top:1.5rem;font-size:0.82rem;color:var(--muted);}
+
+/* Dashboard layout */
+.dashboard{display:flex;min-height:calc(100vh - 65px);}
+.sidebar{width:240px;background:var(--card);border-right:1px solid var(--border);padding:1.5rem 0;flex-shrink:0;position:sticky;top:65px;height:calc(100vh - 65px);overflow-y:auto;}
+.sidebar-section{padding:0 1rem;margin-bottom:1.5rem;}
+.sidebar-label{font-size:0.7rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 0.5rem;margin-bottom:0.5rem;}
+.sidebar-nav a{display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0.75rem;border-radius:var(--radius-sm);font-size:0.9rem;color:var(--muted);text-decoration:none;font-weight:500;transition:var(--transition);}
+.sidebar-nav a:hover,.sidebar-nav a.active{background:var(--gold-glow);color:var(--gold);}
+.nav-icon{font-size:1rem;width:20px;text-align:center;}
+.main-content{flex:1;padding:2rem;overflow-x:hidden;}
+@media(max-width:768px){.sidebar{display:none;}.main-content{padding:1rem;}}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;}
+.section-title{font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;color:var(--white);}
+.section-subtitle{font-size:0.85rem;color:var(--muted);margin-top:0.2rem;}
+
+/* QR */
+.qr-display{display:flex;flex-direction:column;align-items:center;padding:2rem;}
+.qr-wrapper{background:white;padding:1rem;border-radius:var(--radius);margin-bottom:1.5rem;box-shadow:0 0 40px rgba(201,168,76,0.2);}
+.qr-timer{font-family:'Space Grotesk',sans-serif;font-size:2.5rem;font-weight:700;color:var(--gold);text-align:center;margin-bottom:0.5rem;font-variant-numeric:tabular-nums;}
+.qr-timer.urgent{color:var(--error);animation:pulse 1s ease infinite;}
+.qr-timer-label{font-size:0.8rem;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:0.5px;}
+.progress-bar{width:100%;height:6px;background:var(--slate);border-radius:99px;overflow:hidden;margin-top:0.5rem;}
+.progress-fill{height:100%;background:var(--gold);border-radius:99px;transition:width 1s linear;}
+.progress-fill.urgent{background:var(--error);}
+
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted);}
+.empty-icon{font-size:2.5rem;margin-bottom:1rem;opacity:0.4;}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.7s linear infinite;margin:2rem auto;}
+.app-footer{text-align:center;padding:1.5rem;font-size:0.78rem;color:var(--muted);border-top:1px solid var(--border);margin-top:auto;}
+.app-footer span{color:var(--gold);}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeIn 0.3s ease forwards;}
+.divider{border:none;border-top:1px solid var(--border);margin:1.5rem 0;}
+
+.buk-toast{position:fixed;bottom:2rem;right:2rem;background:var(--slate);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.85rem 1.25rem;font-size:0.88rem;color:var(--white);box-shadow:var(--shadow);z-index:9999;transform:translateY(20px);opacity:0;transition:all 0.3s ease;max-width:320px;}
+.buk-toast--visible{transform:translateY(0);opacity:1;}
+.buk-toast--success{border-left:3px solid var(--success);}
+.buk-toast--error{border-left:3px solid var(--error);}
+.buk-toast--info{border-left:3px solid var(--gold);}
+
+@media print {
+  body * { visibility: hidden; }
+  #print-area, #print-area * { visibility: visible; }
+  #print-area { position: fixed; top:0; left:0; width:100%; height:100%; display:flex !important; align-items:center; justify-content:center; background:white; }
+}
+</style>
+</head>
+<body class="page-wrapper">
+
+<!-- ════════════════ AUTH SCREEN ════════════════ -->
+<div id="auth-screen" class="auth-page">
+  <div class="auth-card fade-in">
+    <div class="auth-logo">
+      <div class="logo-badge">BUK</div>
+      <h1>BUK QRAttend</h1>
+      <p>Lecturer Portal</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+      <button class="auth-tab" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <div id="login-form">
+      <div class="alert alert-error" id="login-error"></div>
+      <div class="form-group">
+        <label class="form-label">Staff ID</label>
+        <input type="text" id="login-staffid" class="form-control" placeholder="e.g. BUK/STAFF/0012"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="login-password" class="form-control" placeholder="Enter your password"/>
+      </div>
+      <button class="btn btn-primary btn-full" id="login-btn" onclick="handleLogin()">Sign In</button>
+      <div class="auth-footer">No account? <a href="#" onclick="switchTab('register')">Register here</a></div>
+    </div>
+
+    <div id="register-form" style="display:none;">
+      <div class="alert alert-error" id="reg-error"></div>
+      <div class="alert alert-success" id="reg-success"></div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" id="reg-name" class="form-control" placeholder="Dr. Aminu Musa"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Staff ID</label>
+        <input type="text" id="reg-staffid" class="form-control" placeholder="e.g. BUK/STAFF/0012"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Department</label>
+        <select id="reg-department" class="form-control">
+          <option value="">Select Department</option>
+          <option>Computer Science</option><option>Information Technology</option>
+          <option>Software Engineering</option><option>Cyber Security</option>
+          <option>Information Systems</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="reg-password" class="form-control" placeholder="Min. 8 characters"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input type="password" id="reg-confirm" class="form-control" placeholder="Repeat password"/>
+      </div>
+      <button class="btn btn-primary btn-full" id="reg-btn" onclick="handleRegister()">Create Account</button>
+      <div class="auth-footer">Already registered? <a href="#" onclick="switchTab('login')">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ DASHBOARD SCREEN ════════════════ -->
+<div id="dashboard-screen" style="display:none;">
+
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="logo-icon">BUK</div>
+    <div class="brand-text">BUK <span>QRAttend</span> — Lecturer</div>
+  </div>
+  <div class="navbar-actions">
+    <span class="navbar-user">Dr. <strong id="nav-name">—</strong></span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="dashboard">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Main</div>
+      <nav class="sidebar-nav">
+        <a href="#" class="active" data-section="overview" onclick="showSection(this)"><span class="nav-icon">📊</span> Overview</a>
+        <a href="#" data-section="new-session" onclick="showSection(this)"><span class="nav-icon">➕</span> New Session</a>
+        <a href="#" data-section="sessions" onclick="showSection(this)"><span class="nav-icon">📋</span> My Sessions</a>
+        <a href="#" data-section="attendance" onclick="showSection(this)"><span class="nav-icon">✅</span> Attendance</a>
+        <a href="#" data-section="reports" onclick="showSection(this)"><span class="nav-icon">📄</span> Export PDF</a>
+      </nav>
+    </div>
+  </aside>
+
+  <main class="main-content">
+
+    <section id="section-overview" class="fade-in">
+      <div class="section-header">
+        <div><div class="section-title">Overview</div><div class="section-subtitle" id="overview-date"></div></div>
+        <button class="btn btn-primary btn-sm" onclick="document.querySelector('[data-section=\'new-session\']').click()">➕ New Session</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="st-sessions">0</div><div class="stat-label">Total Sessions</div></div>
+        <div class="stat-card"><div class="stat-value" id="st-today">0</div><div class="stat-label">Today</div></div>
+        <div class="stat-card"><div class="stat-value" id="st-att">0</div><div class="stat-label">Total Attendance</div></div>
+        <div class="stat-card"><div class="stat-value" id="st-students">0</div><div class="stat-label">Unique Students</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Recent Sessions</div></div>
+        <div class="table-wrapper"><table>
+          <thead><tr><th>Course</th><th>Date</th><th>Level</th><th>Attended</th><th>Status</th></tr></thead>
+          <tbody id="recent-body"><tr><td colspan="5"><div class="spinner"></div></td></tr></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <section id="section-new-session" style="display:none;" class="fade-in">
+      <div class="section-header"><div><div class="section-title">Create New Session</div><div class="section-subtitle">A QR code will be generated automatically</div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;" class="two-col">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Session Details</div></div>
+          <div class="alert alert-error" id="sess-error"></div>
+          <div class="form-group"><label class="form-label">Course Code</label><input type="text" id="s-code" class="form-control" placeholder="e.g. CSC 301"/></div>
+          <div class="form-group"><label class="form-label">Course Title</label><input type="text" id="s-title" class="form-control" placeholder="e.g. Data Structures"/></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Department</label>
+              <select id="s-dept" class="form-control"><option value="">Select</option><option>Computer Science</option><option>Information Technology</option><option>Software Engineering</option><option>Cyber Security</option><option>Information Systems</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">Level</label>
+              <select id="s-level" class="form-control"><option value="">Select</option><option>100 Level</option><option>200 Level</option><option>300 Level</option><option>400 Level</option><option>500 Level</option></select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Date</label><input type="date" id="s-date" class="form-control"/></div>
+            <div class="form-group"><label class="form-label">Start Time</label><input type="time" id="s-time" class="form-control"/></div>
+          </div>
+          <div class="form-group"><label class="form-label">QR Expires In</label>
+            <select id="s-expiry" class="form-control"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select>
+          </div>
+          <button class="btn btn-primary btn-full" id="create-btn" onclick="createSession()">Generate QR Code</button>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">QR Code</div><div class="card-subtitle">Show this to students</div></div>
+          <div id="qr-placeholder" class="empty-state"><div class="empty-icon">📱</div><p>Fill the form and click Generate QR Code.</p></div>
+          <div id="qr-display" style="display:none;" class="qr-display">
+            <div class="qr-wrapper"><canvas id="qr-canvas"></canvas></div>
+            <div class="qr-timer" id="qr-countdown">10:00</div>
+            <div class="qr-timer-label">Time Remaining</div>
+            <div class="progress-bar" style="width:260px;margin-top:0.75rem;"><div class="progress-fill" id="qr-progress" style="width:100%;"></div></div>
+            <div style="margin-top:1.25rem;display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;">
+              <button class="btn btn-primary btn-sm" onclick="printQR()">🖨 Print QR</button>
+              <button class="btn btn-outline btn-sm" onclick="saveQR()">⬇ Save Image</button>
+              <button class="btn btn-ghost btn-sm" onclick="resetQR()">✕ Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <style>@media(max-width:768px){.two-col{grid-template-columns:1fr!important}}</style>
+    </section>
+
+    <section id="section-sessions" style="display:none;" class="fade-in">
+      <div class="section-header"><div><div class="section-title">My Sessions</div></div><button class="btn btn-outline btn-sm" onclick="loadSessions()">↻ Refresh</button></div>
+      <div class="card" style="padding:0;"><div class="table-wrapper"><table>
+        <thead><tr><th>Course</th><th>Dept</th><th>Level</th><th>Date</th><th>Time</th><th>Attended</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="sessions-body"><tr><td colspan="8"><div class="spinner"></div></td></tr></tbody>
+      </table></div></div>
+    </section>
+
+    <section id="section-attendance" style="display:none;" class="fade-in">
+      <div class="section-header"><div><div class="section-title">Attendance Records</div></div></div>
+      <div class="card" style="margin-bottom:1.25rem;">
+        <div class="form-row">
+          <div class="form-group" style="margin-bottom:0;"><label class="form-label">Filter by Session</label><select id="att-filter" class="form-control" onchange="loadAttendance()"><option value="">All Sessions</option></select></div>
+          <div class="form-group" style="margin-bottom:0;"><label class="form-label">Filter by Department</label><select id="att-dept" class="form-control" onchange="loadAttendance()"><option value="">All Departments</option><option>Computer Science</option><option>Information Technology</option><option>Software Engineering</option><option>Cyber Security</option><option>Information Systems</option></select></div>
+        </div>
+      </div>
+      <div class="card" style="padding:0;"><div class="table-wrapper"><table>
+        <thead><tr><th>Name</th><th>Reg. No.</th><th>Department</th><th>Level</th><th>Course</th><th>Scanned At</th></tr></thead>
+        <tbody id="att-body"><tr><td colspan="6"><div class="spinner"></div></td></tr></tbody>
+      </table></div></div>
+    </section>
+
+    <section id="section-reports" style="display:none;" class="fade-in">
+      <div class="section-header"><div><div class="section-title">Export PDF Report</div></div></div>
+      <div class="card" style="max-width:480px;">
+        <div class="form-group"><label class="form-label">Select Session</label><select id="pdf-session" class="form-control"><option value="">All Sessions</option></select></div>
+        <div class="form-group"><label class="form-label">Report Title</label><input type="text" id="pdf-title" class="form-control" placeholder="e.g. CSC 301 Attendance"/></div>
+        <button class="btn btn-primary" id="pdf-btn" onclick="exportPDF()">📄 Download PDF</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="print-area" style="display:none;">
+  <div style="background:white;padding:2.5rem;border-radius:12px;text-align:center;max-width:400px;width:100%;font-family:'Inter',sans-serif;">
+    <div style="background:#0A1628;color:#C9A84C;padding:1rem;border-radius:8px;margin-bottom:1.5rem;">
+      <div style="font-size:1.4rem;font-weight:700;letter-spacing:1px;">BUK QRAttend</div>
+      <div style="font-size:0.8rem;color:#F0F4FF;margin-top:0.25rem;">Faculty of Computing — Bayero University Kano</div>
+    </div>
+    <canvas id="print-qr-canvas" style="margin-bottom:1.25rem;border:4px solid #0A1628;border-radius:8px;"></canvas>
+    <div id="print-course" style="font-size:1.1rem;font-weight:700;color:#0A1628;margin-bottom:0.4rem;"></div>
+    <div id="print-meta" style="font-size:0.85rem;color:#555;margin-bottom:0.4rem;"></div>
+    <div id="print-lecturer" style="font-size:0.85rem;color:#555;margin-bottom:1rem;"></div>
+    <div style="background:#f5f5f5;border-radius:6px;padding:0.75rem;font-size:0.78rem;color:#777;">Scan with BUK QRAttend Student Portal to mark attendance</div>
+    <div style="margin-top:1.25rem;font-size:0.72rem;color:#aaa;">Proposed by Faculty of Computing, Bayero University Kano</div>
+  </div>
+</div>
+
+<div class="app-footer">Proposed by <span>Faculty of Computing, Bayero University Kano</span></div>
+
+</div><!-- /dashboard-screen -->
+
+<script>
+// ════════════════ SUPABASE CONFIG ════════════════
+const SUPABASE_URL = 'https://giiipmlfyexwpxlgsbap.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpaWlwbWxmeWV4d3B4bGdzYmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MjAzNzYsImV4cCI6MjA5ODI5NjM3Nn0.fP9BxyEjIDXZY6dnO2T7PcZ1Vq7EICP72Orge57XZ2E';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// 🔴 IMPORTANT: After you deploy the STUDENT site, paste its live URL here:
+const STUDENT_SITE_URL = 'https://hasbeeyallah.github.io/buk-qrattend-student';
+
+// ════════════════ HELPERS ════════════════
+function generateEmail(identifier, role) {
+  const clean = identifier.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+  return `${role}${clean}@bukqrattend.com`;
+}
+function getCurrentUser(role){ const d=localStorage.getItem(`bukqrattend_${role}`); return d?JSON.parse(d):null; }
+function saveUserSession(role,u){ localStorage.setItem(`bukqrattend_${role}`,JSON.stringify(u)); }
+function clearUserSession(role){ localStorage.removeItem(`bukqrattend_${role}`); }
+function showToast(msg,type='success'){
+  const ex=document.querySelector('.buk-toast'); if(ex) ex.remove();
+  const t=document.createElement('div'); t.className=`buk-toast buk-toast--${type}`; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('buk-toast--visible'),10);
+  setTimeout(()=>{t.classList.remove('buk-toast--visible'); setTimeout(()=>t.remove(),400);},3500);
+}
+function formatDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{weekday:'short',year:'numeric',month:'short',day:'numeric'}); }
+function formatTime(t){ if(!t) return '—'; const [h,m]=t.split(':'); const hr=parseInt(h); const ap=hr>=12?'PM':'AM'; return `${hr%12||12}:${m} ${ap}`; }
+function generateQRToken(){ return crypto.randomUUID().replace(/-/g,'').toUpperCase(); }
+
+// ════════════════ APP STATE ════════════════
+let currentUser=null, qrInterval=null, lastQRUrl='', lastSession=null;
+
+window.addEventListener('load', async () => {
+  currentUser = getCurrentUser('lecturer');
+  if (currentUser) {
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('dashboard-screen').style.display='block';
+    document.getElementById('nav-name').textContent = currentUser.name.split(' ').slice(0,2).join(' ');
+    document.getElementById('overview-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    document.getElementById('s-date').value = new Date().toISOString().split('T')[0];
+    await loadOverview();
+    await populateSessionDropdowns();
+  }
+});
+
+// ════════════════ AUTH ════════════════
+function switchTab(tab){
+  const isLogin = tab==='login';
+  document.getElementById('login-form').style.display = isLogin?'block':'none';
+  document.getElementById('register-form').style.display = isLogin?'none':'block';
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active', isLogin? i===0 : i===1));
+}
+function showAlert(id,msg){ const el=document.getElementById(id); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),5000); }
+function setBtn(id,loading,label){ const b=document.getElementById(id); b.disabled=loading; b.textContent=loading?'Please wait...':label; }
+
+async function handleLogin(){
+  const staffId=document.getElementById('login-staffid').value.trim();
+  const password=document.getElementById('login-password').value;
+  if(!staffId||!password) return showAlert('login-error','Please fill in all fields.');
+  setBtn('login-btn',true,'Sign In');
+  try{
+    const email=generateEmail(staffId,'lecturer');
+    const {data,error}=await db.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    const {data:lecturer,error:pErr}=await db.from('lecturers').select('*').eq('staff_id',staffId.toUpperCase()).single();
+    if(pErr||!lecturer) throw new Error('Lecturer profile not found.');
+    saveUserSession('lecturer',{id:lecturer.id,name:lecturer.full_name,staffId:lecturer.staff_id,department:lecturer.department,authId:data.user.id});
+    showToast('Welcome back, '+lecturer.full_name.split(' ')[0]+'!','success');
+    setTimeout(()=>window.location.reload(),700);
+  }catch(err){ showAlert('login-error', err.message||'Login failed. Check your credentials.'); }
+  finally{ setBtn('login-btn',false,'Sign In'); }
+}
+
+async function handleRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const staffId=document.getElementById('reg-staffid').value.trim().toUpperCase();
+  const dept=document.getElementById('reg-department').value;
+  const password=document.getElementById('reg-password').value;
+  const confirm=document.getElementById('reg-confirm').value;
+  if(!name||!staffId||!dept||!password||!confirm) return showAlert('reg-error','All fields are required.');
+  if(password.length<8) return showAlert('reg-error','Password must be at least 8 characters.');
+  if(password!==confirm) return showAlert('reg-error','Passwords do not match.');
+  setBtn('reg-btn',true,'Create Account');
+  try{
+    const email=generateEmail(staffId,'lecturer');
+    const {error:authErr}=await db.auth.signUp({email,password});
+    if(authErr) throw authErr;
+    const {error:insertErr}=await db.from('lecturers').insert({full_name:name,staff_id:staffId,department:dept,email});
+    if(insertErr) throw insertErr;
+    showAlert('reg-success','✓ Account created! You can now sign in.');
+    setTimeout(()=>switchTab('login'),2000);
+  }catch(err){ showAlert('reg-error', err.message?.includes('already')?'This Staff ID is already registered.':err.message||'Registration failed.'); }
+  finally{ setBtn('reg-btn',false,'Create Account'); }
+}
+
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter') return;
+  if(document.getElementById('auth-screen').style.display==='none') return;
+  const loginVisible=document.getElementById('login-form').style.display!=='none';
+  if(loginVisible) handleLogin(); else handleRegister();
+});
+
+function logout(){
+  clearInterval(qrInterval);
+  db.auth.signOut();
+  clearUserSession('lecturer');
+  window.location.reload();
+}
+
+// ════════════════ NAVIGATION ════════════════
+function showSection(link){
+  event.preventDefault();
+  const name=link.dataset.section;
+  document.querySelectorAll('main > section').forEach(s=>s.style.display='none');
+  document.getElementById('section-'+name).style.display='block';
+  document.querySelectorAll('.sidebar-nav a').forEach(a=>a.classList.remove('active'));
+  link.classList.add('active');
+  if(name==='sessions') loadSessions();
+  if(name==='attendance') loadAttendance();
+}
+
+// ════════════════ OVERVIEW ════════════════
+async function loadOverview(){
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const {data:sessions}=await db.from('sessions').select('id,date').eq('lecturer_id',currentUser.id);
+    const {data:att}=await db.from('attendance').select('student_id, sessions!inner(lecturer_id)').eq('sessions.lecturer_id',currentUser.id);
+    document.getElementById('st-sessions').textContent=sessions?.length||0;
+    document.getElementById('st-today').textContent=sessions?.filter(s=>s.date===today).length||0;
+    document.getElementById('st-att').textContent=att?.length||0;
+    document.getElementById('st-students').textContent=new Set(att?.map(a=>a.student_id)).size;
+
+    const {data:recent}=await db.from('sessions').select('*, attendance(count)').eq('lecturer_id',currentUser.id).order('created_at',{ascending:false}).limit(5);
+    const tbody=document.getElementById('recent-body');
+    if(!recent?.length){ tbody.innerHTML=`<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><p>No sessions yet. Create your first session.</p></div></td></tr>`; return; }
+    tbody.innerHTML=recent.map(s=>{
+      const expired=new Date()>new Date(s.expires_at);
+      return `<tr><td><strong>${s.course_code}</strong><br/><span style="font-size:0.78rem;color:var(--muted)">${s.course_title}</span></td><td>${formatDate(s.date)}</td><td><span class="chip">${s.level}</span></td><td><span class="badge badge-gold">${s.attendance?.[0]?.count||0}</span></td><td>${expired?'<span class="badge badge-muted">Expired</span>':'<span class="badge badge-success">Active</span>'}</td></tr>`;
+    }).join('');
+  }catch(e){ console.error(e); }
+}
+
+// ════════════════ CREATE SESSION ════════════════
+async function createSession(){
+  const code=document.getElementById('s-code').value.trim().toUpperCase();
+  const title=document.getElementById('s-title').value.trim();
+  const dept=document.getElementById('s-dept').value;
+  const level=document.getElementById('s-level').value;
+  const date=document.getElementById('s-date').value;
+  const time=document.getElementById('s-time').value;
+  const expMin=parseInt(document.getElementById('s-expiry').value);
+  if(!code||!title||!dept||!level||!date||!time) return showSessAlert('Please fill in all fields.');
+
+  const btn=document.getElementById('create-btn'); btn.disabled=true; btn.textContent='Creating...';
+  try{
+    const qrToken=generateQRToken();
+    const expiresAt=new Date(Date.now()+expMin*60000).toISOString();
+    const scanUrl=`${STUDENT_SITE_URL}/index.html?token=${qrToken}`;
+
+    const {data:session,error}=await db.from('sessions').insert({
+      lecturer_id:currentUser.id, course_code:code, course_title:title,
+      department:dept, level, date, start_time:time, expires_at:expiresAt, qr_token:qrToken
+    }).select().single();
+    if(error) throw error;
+
+    lastSession={...session, scanUrl}; lastQRUrl=scanUrl;
+    document.getElementById('qr-placeholder').style.display='none';
+    document.getElementById('qr-display').style.display='flex';
+    await QRCode.toCanvas(document.getElementById('qr-canvas'), scanUrl, {width:260,color:{dark:'#0A1628',light:'#FFFFFF'}});
+    startTimer(expMin*60);
+    showToast('Session created! Show QR to students.','success');
+    loadOverview(); populateSessionDropdowns();
+  }catch(e){ showSessAlert(e.message||'Failed to create session.'); }
+  finally{ btn.disabled=false; btn.textContent='Generate QR Code'; }
+}
+function showSessAlert(msg){ const el=document.getElementById('sess-error'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),5000); }
+
+function startTimer(total){
+  clearInterval(qrInterval); let rem=total;
+  const tick=()=>{
+    const m=Math.floor(rem/60), s=rem%60;
+    document.getElementById('qr-countdown').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    document.getElementById('qr-progress').style.width=`${(rem/total)*100}%`;
+    if(rem<=60){ document.getElementById('qr-countdown').classList.add('urgent'); document.getElementById('qr-progress').classList.add('urgent'); }
+    if(rem<=0){ clearInterval(qrInterval); showToast('QR code has expired.','error'); }
+    rem--;
+  };
+  tick(); qrInterval=setInterval(tick,1000);
+}
+function resetQR(){
+  clearInterval(qrInterval);
+  document.getElementById('qr-display').style.display='none';
+  document.getElementById('qr-placeholder').style.display='block';
+  document.getElementById('qr-countdown').classList.remove('urgent');
+  document.getElementById('qr-progress').classList.remove('urgent');
+}
+function saveQR(){
+  const canvas=document.getElementById('qr-canvas');
+  const link=document.createElement('a');
+  link.download=`BUKQRAttend_${lastSession?.course_code||'QR'}.png`;
+  link.href=canvas.toDataURL(); link.click();
+}
+async function printQR(){
+  if(!lastQRUrl||!lastSession) return showToast('No QR to print.','error');
+  document.getElementById('print-area').style.display='flex';
+  await QRCode.toCanvas(document.getElementById('print-qr-canvas'), lastQRUrl, {width:220,color:{dark:'#0A1628',light:'#FFFFFF'}});
+  document.getElementById('print-course').textContent=`${lastSession.course_code} — ${lastSession.course_title}`;
+  document.getElementById('print-meta').textContent=`${lastSession.department} | ${lastSession.level} | ${formatDate(lastSession.date)} ${formatTime(lastSession.start_time)}`;
+  document.getElementById('print-lecturer').textContent=`Lecturer: ${currentUser.name}`;
+  setTimeout(()=>{ window.print(); document.getElementById('print-area').style.display='none'; },300);
+}
+
+// ════════════════ SESSIONS LIST ════════════════
+async function loadSessions(){
+  const tbody=document.getElementById('sessions-body');
+  tbody.innerHTML=`<tr><td colspan="8"><div class="spinner"></div></td></tr>`;
+  const {data}=await db.from('sessions').select('*, attendance(count)').eq('lecturer_id',currentUser.id).order('date',{ascending:false});
+  if(!data?.length){ tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><p>No sessions yet.</p></div></td></tr>`; return; }
+  tbody.innerHTML=data.map(s=>{
+    const expired=new Date()>new Date(s.expires_at);
+    return `<tr><td><strong>${s.course_code}</strong><br/><span style="font-size:0.78rem;color:var(--muted)">${s.course_title}</span></td><td><span class="chip">${s.department}</span></td><td><span class="chip">${s.level}</span></td><td>${formatDate(s.date)}</td><td>${formatTime(s.start_time)}</td><td><span class="badge badge-gold">${s.attendance?.[0]?.count||0}</span></td><td>${expired?'<span class="badge badge-muted">Expired</span>':'<span class="badge badge-success">Active</span>'}</td><td><button class="btn btn-ghost btn-sm" onclick="viewAtt('${s.id}')">View</button></td></tr>`;
+  }).join('');
+}
+
+// ════════════════ ATTENDANCE ════════════════
+async function loadAttendance(){
+  const tbody=document.getElementById('att-body');
+  tbody.innerHTML=`<tr><td colspan="6"><div class="spinner"></div></td></tr>`;
+  const sessFilter=document.getElementById('att-filter')?.value;
+  const deptFilter=document.getElementById('att-dept')?.value;
+  let query=db.from('attendance').select('*, students(*), sessions!inner(*, lecturer_id)').eq('sessions.lecturer_id',currentUser.id).order('scanned_at',{ascending:false});
+  if(sessFilter) query=query.eq('session_id',sessFilter);
+  const {data}=await query;
+  let records=data||[];
+  if(deptFilter) records=records.filter(r=>r.students?.department===deptFilter);
+  if(!records.length){ tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">✅</div><p>No attendance records yet.</p></div></td></tr>`; return; }
+  tbody.innerHTML=records.map(r=>`<tr><td><strong>${r.students?.full_name||'—'}</strong></td><td>${r.students?.reg_number||'—'}</td><td><span class="chip">${r.students?.department||'—'}</span></td><td><span class="chip">${r.students?.level||'—'}</span></td><td>${r.sessions?.course_code||'—'}</td><td>${new Date(r.scanned_at).toLocaleString('en-GB')}</td></tr>`).join('');
+}
+function viewAtt(sessionId){
+  document.querySelector('[data-section="attendance"]').click();
+  document.getElementById('att-filter').value=sessionId;
+  loadAttendance();
+}
+
+// ════════════════ DROPDOWNS ════════════════
+async function populateSessionDropdowns(){
+  const {data}=await db.from('sessions').select('id,course_code,date').eq('lecturer_id',currentUser.id).order('date',{ascending:false});
+  ['att-filter','pdf-session'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    const existing=[...sel.options].map(o=>o.value);
+    (data||[]).forEach(s=>{
+      if(!existing.includes(s.id)){
+        const opt=document.createElement('option'); opt.value=s.id; opt.textContent=`${s.course_code} — ${formatDate(s.date)}`; sel.appendChild(opt);
+      }
+    });
+  });
+}
+
+// ════════════════ EXPORT PDF ════════════════
+async function exportPDF(){
+  const sessId=document.getElementById('pdf-session').value;
+  const title=document.getElementById('pdf-title').value||'Attendance Report';
+  const btn=document.getElementById('pdf-btn'); btn.disabled=true; btn.textContent='Generating...';
+  try{
+    let query=db.from('attendance').select('*, students(*), sessions!inner(*, lecturer_id)').eq('sessions.lecturer_id',currentUser.id);
+    if(sessId) query=query.eq('session_id',sessId);
+    const {data}=await query.order('scanned_at');
+    const rows=(data||[]).map((r,i)=>`<tr style="background:${i%2===0?'#f9f9f9':'white'}"><td style="padding:8px;border:1px solid #ddd;">${i+1}</td><td style="padding:8px;border:1px solid #ddd;">${r.students?.full_name||'—'}</td><td style="padding:8px;border:1px solid #ddd;">${r.students?.reg_number||'—'}</td><td style="padding:8px;border:1px solid #ddd;">${r.students?.department||'—'}</td><td style="padding:8px;border:1px solid #ddd;">${r.sessions?.course_code||'—'}</td><td style="padding:8px;border:1px solid #ddd;">${new Date(r.scanned_at).toLocaleString('en-GB')}</td></tr>`).join('');
+    const win=window.open('','_blank');
+    win.document.write(`<html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:2rem;}h1{color:#0A1628;}table{width:100%;border-collapse:collapse;}th{background:#0A1628;color:#C9A84C;padding:10px;border:1px solid #ddd;text-align:left;}footer{margin-top:2rem;font-size:0.75rem;color:#888;}</style></head><body><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;"><div style="background:#0A1628;color:#C9A84C;padding:0.5rem 1rem;border-radius:6px;font-weight:700;font-size:1.1rem;">BUK QRAttend</div><div><h2 style="margin:0;color:#0A1628;">${title}</h2><p style="margin:0;color:#555;font-size:0.85rem;">Lecturer: ${currentUser.name} | Generated: ${new Date().toLocaleString('en-GB')}</p></div></div><table><thead><tr><th>#</th><th>Name</th><th>Reg. No.</th><th>Department</th><th>Course</th><th>Scanned At</th></tr></thead><tbody>${rows}</tbody></table><p style="margin-top:1rem;color:#555;">${data?.length||0} student(s) total</p><footer>Proposed by Faculty of Computing, Bayero University Kano</footer></body></html>`);
+    win.document.close();
+    setTimeout(()=>win.print(),500);
+    showToast('PDF ready — use Print → Save as PDF','success');
+  }catch(e){ showToast('Export failed: '+e.message,'error'); }
+  finally{ btn.disabled=false; btn.textContent='📄 Download PDF'; }
+}
+</script>
+</body>
+</html>
